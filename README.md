@@ -74,7 +74,49 @@ srec_cat <payload.hex> -intel -fill 0xFF 0x0000 0xEFFE -Cyclic_Redundancy_Check_
 srec_cat <payload.hex> -intel -fill 0xFF 0x0000 0xDFFE -Cyclic_Redundancy_Check_16_Little_Endian 0xDFFE -o  payload.bin -binary
 ```
 
-* in both cases you end up with the binary, which has to go through the converter to get the EQ3 format
+* The bootloader can flash itself (warning, this may brick the bootloader and require to connect a real programmer to the device again). To flash a new bootloader OTA, use the following commands to prepare the binary file. This adds a magic word to the image which will indicate to the bootloader that it should overwrite itself after transmitting the OTA image.
+
+* For 64k devices with 8k bootloader space like Atmega 644:
+```
+	srec_cat Bootloader-AskSin-OTA-HM_LC_Sw1PBU_FM_8k.hex -intel \
+	-offset -0xe000 \
+	-fill 0xFF 0x0000 0xdffc \
+	-generate 0xdffc 0xdffe -repeat-data 0x11 0x47 \
+	-o  payload_temp.bin -binary
+
+	
+	srec_cat payload_temp.bin -binary \
+	-Cyclic_Redundancy_Check_16_Little_Endian 0xDFFE \
+	-o  payload.bin -binary
+```
+* For 64k devices with 4k bootloader space like Atmega 644:
+```
+	srec_cat Bootloader-AskSin-OTA-HM_LC_Sw1PBU_FM.hex -intel \
+	-offset -0xf000 \
+	-fill 0xFF 0x0000 0xeffc \
+	-generate 0xeffc 0xeffe -repeat-data 0x11 0x47 \
+	-o  payload_temp.bin -binary
+
+	
+	srec_cat payload_temp.bin -binary \
+	-Cyclic_Redundancy_Check_16_Little_Endian 0xEFFE \
+	-o  payload.bin -binary
+```
+* For 32k devices with 4k bootloader space like Atmega 328p:
+```
+	srec_cat Bootloader-AskSin-OTA-HB_UW_Sen_THPL.hex -intel \
+	-offset -0x7000 \
+	-fill 0xFF 0x0000 0x6ffc \
+	-generate 0x7ffc 0x7ffe -repeat-data 0x11 0x47 \
+	-o  payload_temp.bin -binary
+
+	
+	srec_cat payload_temp.bin -binary \
+	-Cyclic_Redundancy_Check_16_Little_Endian 0x7FFE \
+	-o  payload.bin -binary
+```
+
+* in all cases you end up with the binary, which has to go through the converter to get the EQ3 format
 * Use the converter (need php-cli):
 ```
 ./bin2eq3.php payload.bin payload.eq3 # convert to eq3 hex format
