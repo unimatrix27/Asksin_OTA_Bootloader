@@ -1,4 +1,4 @@
-// Pin assignment for Atmega328p (Univarsalsensor)
+// Pin assignment for Atmega644a (HM-LC-Sw1PBU-FM)
 
 // Pin assignment for the cc1101 module
 #define PORT_SPI             PORTB												// The Port B Data Register

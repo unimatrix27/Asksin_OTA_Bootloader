@@ -2,7 +2,7 @@
 #include "config.h"
 
 #if DEBUG > 0
-	#define VERSION_STRING       "\nAskSin OTA Bootloader V0.6 \n\n"			// version number for debug info
+	#define VERSION_STRING       "\nAskSin OTA BL V0.8 \n\n"			        //  version number for debug info
 	#define BOOT_UART_BAUD_RATE  57600											// Baudrate
 #endif
 
@@ -10,6 +10,37 @@
 	#define WAIT_FOR_CONFIG = 10
 #endif
 
+#define MAGIC_WORD 0x4711
+
+// the updateBootloaderFromRWW function is placed in the topmost page and cannot be changed via OTA Update
+// this must not be touched for OTA update otherwise you may brick the bootloader and need and ISP update
+void updateBootloaderFromRWW(void) __attribute__ ((section (".boot1")));
+
+void updateBootloaderFromRWW(){
+	// copy bootloader image from RWW section into NRWW section (except top page with this function)
+	
+	//uint32_t address;
+	for (uint8_t i=0;i<BOOT_PAGES-1;i++){
+		//address=BOOTLOADER_START+(i*SPM_PAGESIZE);
+		boot_page_erase (BOOTLOADER_START+(i*SPM_PAGESIZE));
+		for(uint16_t j=0;j<SPM_PAGESIZE;j=j+2){				
+			//wordbuf=pgm_read_word((i*SPM_PAGESIZE)+j);
+			//address=BOOTLOADER_START+(i*SPM_PAGESIZE)+j;
+			boot_page_fill(BOOTLOADER_START+(i*SPM_PAGESIZE)+j,pgm_read_word((i*SPM_PAGESIZE)+j));
+		}
+
+		boot_page_write(BOOTLOADER_START+(i*SPM_PAGESIZE));
+		boot_spm_busy_wait();
+		boot_rww_enable();
+	}
+	//address=BOOTLOADER_START-SPM_PAGESIZE;	
+	boot_page_erase(BOOTLOADER_START-SPM_PAGESIZE);
+
+	wdt_enable(WDTO_1S);
+	while(1);																// wait for Watchdog to generate reset
+}
+
+		
 /*****************************************
  *        Address data section           *
  *           See Makefile                *
@@ -324,7 +355,18 @@ void startApplication() {
 		uart_puts_P("Start App\n");
 		_delay_ms(250);
 	#endif
-
+	/**
+	 * Check if new Bootloader was flashed via OTA and is ready to be transfered into BL area. 
+	 */
+	if(pgm_read_word(BOOTLOADER_START-4) == MAGIC_WORD){
+		#if DEBUG > 0			
+			uart_puts_P("Bootloader Self Update!\n");
+			_delay_ms(250);
+		#endif
+		cli();
+		updateBootloaderFromRWW();
+	}	
+			
 	/*
 	 * Vor Rücksprung eventuell benutzte Hardware deaktivieren
 	 * und Interrupts global deaktivieren, da kein "echter" Reset erfolgt
